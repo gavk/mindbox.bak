@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels: 
+    app: scalable
+  name: scalable
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scalable
+  template:
+    metadata:
+      labels:
+        app: scalable
+    spec:
+      containers:
+      - name: scalable
+        image: nginx:1.13
+        resources:
+          # Задаём лимиты и требования с запасом
+          limits:
+            memory: 160Mi
+            # 2 - это значительно больше, чем 0.1
+            cpu: 2
+          requests:
+            memory: 160Mi
+            cpu: 0.15
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+          # Приложению требуется 5-10 секунд для старта.
+          # Значит, через 12 секунд оно должно точно работать
+          failureThreshold: 6
+          periodSeconds: 2
+          # Определяем живое ли приложение или уже нет:
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 5
+        # А готово ли приложение принимать трафик?
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 2
+      affinity:
+        # По одному поду на ноду для отказоустойчивости
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - scalable
+...
